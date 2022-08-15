@@ -287,10 +287,14 @@ void delaytimerfunction(void) // 1us ohne ramp
    
    if (timerstatus & (1<<TIMER_ON))
    {
-      bres_delay-=1;
+      if (bres_delay)
+      {
+         bres_delay-=1;
+      }
+      return;
       //OSZI_A_LO();
       {
-         
+       /*  
          if(CounterA)
          {
             CounterA-=1;
@@ -307,7 +311,7 @@ void delaytimerfunction(void) // 1us ohne ramp
          {
             CounterD-=1;
          }
-         
+         */
           //      timer2Counter = 0; 
          //OSZI_B_TOGG ;
       } 
@@ -775,7 +779,7 @@ uint8_t  AbschnittLaden_bres(const uint8_t* AbschnittDaten) // 22us
     DelayB = (AbschnittDaten[7]<<8) | AbschnittDaten[6];
    
    
-   Serial.printf("AbschnittLaden_bres StepCounterA: %d DelayA: %d StepCounterB: %d DelayB: %d\n",StepCounterA, DelayA, StepCounterB, DelayB);
+   Serial.printf("\nAbschnittLaden_bres StepCounterA: %d DelayA: %d StepCounterB: %d DelayB: %d\n",StepCounterA, DelayA, StepCounterB, DelayB);
 
    CounterB = DelayB;
    
@@ -881,9 +885,8 @@ uint8_t  AbschnittLaden_bres(const uint8_t* AbschnittDaten) // 22us
    //  ****
    //  Bresenham
    //  ***
-   Serial.printf("AbschnittLaden_bres vor bresenham: StepCounterA: %d StepCounterB: %d\n",StepCounterA,StepCounterB);
+   //Serial.printf("AbschnittLaden_bres vor bresenham: StepCounterA: %d StepCounterB: %d\n",StepCounterA,StepCounterB);
 
-   bresenham_errCD = StepCounterC + StepCounterD;
    // bresenham reset
    bresenhamstatus = 0;
    
@@ -899,7 +902,6 @@ uint8_t  AbschnittLaden_bres(const uint8_t* AbschnittDaten) // 22us
       ddyA = 1;
       deltaslowdirectionA = StepCounterB;
       deltafastdirectionA = StepCounterA;
-      bres_delay = DelayA;
       deltafastdelay = DelayA;
       Serial.printf("AbschnittLaden_bres  A > B\n");
    }
@@ -914,14 +916,14 @@ uint8_t  AbschnittLaden_bres(const uint8_t* AbschnittDaten) // 22us
       ddyA = 1;
       deltaslowdirectionA = StepCounterA;
       deltafastdirectionA = StepCounterB;
-      bres_delay = DelayB; // counter for delay
       deltafastdelay = DelayB;
       Serial.printf("AbschnittLaden_bres  A < B\n");
    }
+   // aktuelle Werte einsetzen
    bres_delay = deltafastdelay; // aktueller delay in fastdir
-   bres_counter = deltafastdirectionA; // counter fuer steps
+   bres_counter = deltafastdirectionA; // aktueller counter fuer steps
    
-   xA = StepCounterA; // !!! Schritte werden incrementiert !!!
+   xA = StepCounterA; // 
    yA = StepCounterB;
 
    errA = deltafastdirectionA/2;
@@ -2341,15 +2343,20 @@ void loop()
     
    
    // Es hat noch Steps, CounterA ist abgezaehlt (DelayA bestimmt Impulsabstand fuer Steps)
-  // if ((StepCounterA > 0)  && (CounterA == 0) &&(!(anschlagstatus & (1<< END_A0))))
-      if ((bres_counter > 0)  && (bres_delay == 0) &&(!(anschlagstatus & (1<< END_A0))))
+   if ((bres_counter > 0)  && (bres_delay == 0) &&(!(anschlagstatus & (1<< END_A0))))
 
    {
-      noInterrupts();
+   //   noInterrupts();
       //
       // Aktualisierung Fehlerterm
       errA -= deltaslowdirectionA;
+      
       bres_counter -= 1; // steps abarbeiten
+      
+      if (bres_counter < 2)
+      {
+         //Serial.printf("bres_counter: %d xA: %d yA: %d\n",bres_counter, xA, yA);
+      }
       if (errA < 0)
       {
          //Fehlerterm wieder positiv (>=0) machen
@@ -2410,17 +2417,18 @@ void loop()
       
       // Wenn StepCounterA jetzt nach decrement abgelaufen und relevant: next Datenpaket abrufen
      // if ((xA == 0 ) )    // StepCounterA abgelaufen
-         if ((bres_counter == 0 ) )    // relevanter counter abgelaufen
+      if ((bres_counter == 0 ) )    // relevanter counter abgelaufen
       {
          Serial.printf("Motor AB bres_counter ist null\n");
          if ((abschnittnummer==endposition)) // Ablauf fertig
          {  
+            Serial.printf("Motor AB abschnittnummer==endposition xA: %d yA: %d\n",xA, yA);
             if (cncstatus & (1<<GO_HOME))
             {
                homestatus |= (1<<COUNT_A);
             }
 
-             cli();
+            cli();
             ringbufferstatus = 0;
             cncstatus=0;
             // home: 
@@ -2450,6 +2458,8 @@ void loop()
             aktuellelage = AbschnittLaden_bres(CNCDaten[ladeposition]); 
             if (aktuellelage==2) // war letzter Abschnitt
             {
+               Serial.printf("Motor AB war letzter Abschnitt xA: %d yA: %d abschnittnummer: %d\n",xA, yA, abschnittnummer);
+
                endposition=abschnittnummer; // letzter Abschnitt
                
                // Neu: letzten Abschnitt melden
@@ -2465,6 +2475,7 @@ void loop()
             else
             {
                // neuen Abschnitt abrufen
+               Serial.printf("Motor AB neuen Abschnitt abrufen xA: %d yA: %d abschnittnummer: %d\n",xA, yA, abschnittnummer);
                sendbuffer[5]=abschnittnummer;
                sendbuffer[6]=ladeposition;
                //sendbuffer[7]=(ladeposition & 0xFF00) >> 8;
