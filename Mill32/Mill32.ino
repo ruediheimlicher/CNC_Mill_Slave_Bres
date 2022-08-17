@@ -160,11 +160,19 @@ volatile uint16_t           bresenham_e2CD = 0;
 volatile uint16_t           StepStartA = 0; // startwert am Anfang des Abschnittes
 volatile uint16_t           StepStartC = 0;
 
+// Seite A
 volatile int xA, yA, tA, dxA, dyA, incxA, incyA, pdxA, pdyA, ddxA, ddyA, deltaslowdirectionA, deltafastdirectionA, errA;
 
 volatile uint16_t deltafastdelayA = 0; // aktueller delay 
 volatile uint16_t bres_delayA = 0; // steps fuer fastdirection
 volatile uint16_t bres_counterA = 0; // zaehler fuer fastdirection
+
+//Seite B
+volatile int xB, yB, tB, dxB, dyB, incxB, incyB, pdxB, pdyB, ddxB, ddyB, deltaslowdirectionB, deltafastdirectionB, errB;
+
+volatile uint16_t deltafastdelayB = 0; // aktueller delay 
+volatile uint16_t bres_delayB = 0; // steps fuer fastdirection
+volatile uint16_t bres_counterB = 0; // zaehler fuer fastdirection
 
 
 
@@ -872,14 +880,11 @@ uint8_t  AbschnittLaden_bres(const uint8_t* AbschnittDaten) // 22us
    //  ***
    //Serial.printf("AbschnittLaden_bres vor bresenham: StepCounterA: %d StepCounterB: %d\n",StepCounterA,StepCounterB);
 
-   // bresenham reset
-   bresenhamstatus = 0;
+   // bresenham Seite A
    
    // relevanten Motor setzen
    if (StepCounterA > StepCounterB)
    {
-      bresenhamstatus |= (1<<MOTOR_A);
-      
       //
       pdxA = 1;
       pdyA = 0;
@@ -892,8 +897,6 @@ uint8_t  AbschnittLaden_bres(const uint8_t* AbschnittDaten) // 22us
    }
    else
    {
-      bresenhamstatus |= (1<<MOTOR_B);
-      
       //
       pdxA = 0;
       pdyA = 1;
@@ -915,16 +918,49 @@ uint8_t  AbschnittLaden_bres(const uint8_t* AbschnittDaten) // 22us
    
    Serial.printf("AbschnittLaden_bres deltafastdirectionA: %d deltaslowdirectionA: %d  deltafastdelayA: %d errA: %d\n",deltafastdirectionA,deltaslowdirectionA, deltafastdelayA,errA);
 
-
+   // bresenham Seite B
+   
+   // relevanten Motor setzen
    if (StepCounterC > StepCounterD)
    {
-      bresenhamstatus |= (1<<MOTOR_C);
+      //
+      pdxB = 1;
+      pdyB = 0;
+      ddxB = 1;
+      ddyB = 1;
+      deltaslowdirectionB = StepCounterD;
+      deltafastdirectionB = StepCounterC;
+      deltafastdelayB = DelayC;
+      Serial.printf("AbschnittLaden_bres  C > D\n");
    }
    else
    {
-      bresenhamstatus |= (1<<MOTOR_D);
+      //
+      pdxB = 0;
+      pdyB = 1;
+      ddxB = 1;
+      ddyB = 1;
+      deltaslowdirectionB = StepCounterD;
+      deltafastdirectionB = StepCounterC;
+      deltafastdelayB = DelayD;
+      Serial.printf("AbschnittLaden_bres  C < D\n");
    }
+   // aktuelle Werte einsetzen
+   bres_delayB = deltafastdelayB; // aktueller delay in fastdir
+   bres_counterB = deltafastdirectionB; // aktueller counter fuer steps
+   
+   xB = StepCounterC; // 
+   yB = StepCounterD;
 
+   errB = deltafastdirectionB/2;
+   
+   Serial.printf("AbschnittLaden_bres deltafastdirectionB: %d deltaslowdirectionB: %d  deltafastdelayB: %d errB: %d\n",deltafastdirectionB,deltaslowdirectionB, deltafastdelayB,errB);
+
+
+   
+   
+   
+  
    // motorstatus: welcher Motor ist relevant
    motorstatus = AbschnittDaten[21];
    
@@ -1024,6 +1060,9 @@ void AnschlagVonMotor(const uint8_t motor)
                   //STEPPERPORT_1 |= (1<<(MA_EN + motor - 2)); // Paralleler Motor 0,1 OFF
                   StepCounterC=0;
                   StepCounterD=0;
+                  xB = 0;
+                  yB = 0;
+                  
                   //               CounterC=0xFFFF;
                   //               CounterD=0xFFFF;
                }
@@ -1062,6 +1101,9 @@ void AnschlagVonMotor(const uint8_t motor)
                //yA = 0;
                bres_counterA = 0;
                bres_delayA = 0;
+
+               bres_counterB = 0;
+               bres_delayB = 0;
 
                
                /*
@@ -2481,11 +2523,7 @@ void loop()
             
             ladeposition++;
             
-            if (aktuellelage==2)
-            {
-               //ringbufferstatus |= (1<<ENDBIT);
-            }
-            AbschnittCounter++;
+              AbschnittCounter++;
             
          }
       }
@@ -2666,27 +2704,90 @@ void loop()
    // Begin Motor C
 #pragma mark Motor C
    // **************************************
-   // * Motor C *
+   // * Motor C D *
    // **************************************
    
    // Es hat noch Steps, CounterC ist abgezaehlt (DelayA bestimmt Impulsabstand fuer Steps)
-   if ((StepCounterC > 0) &&(CounterC == 0) &&(!(anschlagstatus & (1<< END_C0))))//||(cncstatus & (1<< END_D0)))))//   
+  // if ((StepCounterC > 0) &&(CounterC == 0) &&(!(anschlagstatus & (1<< END_C0))))//||(cncstatus & (1<< END_D0)))))//   
+   if ((bres_counterB > 0)  && (bres_delayB == 0) &&(!(anschlagstatus & (1<< END_C0))))
+
    {
       noInterrupts();
+      
+      // bres
+      // Aktualisierung Fehlerterm
+      errB -= deltaslowdirectionB;
+      
+      bres_counterB -= 1; // steps abarbeiten
+      
+      if (bres_counterB < 2)
+      {
+         //Serial.printf("bres_counterB: %d xB: %d yB: %d\n",bres_counterb, xB, yB);
+      }
+      if (errB < 0)
+      {
+         //Fehlerterm wieder positiv (>=0) machen
+         errB += deltafastdirectionB;
+         // Schritt in langsame Richtung, Diagonalschritt
+         xB -= ddxB;
+         yB -= ddyB;
+         if (xB)
+         {
+            if (ddxB && xB)// Motor C soll steppen
+            {
+               digitalWriteFast(MC_STEP,LOW);
+            }
+         }
+         if (yB)
+         {
+            if (ddyB && yB)// Motor D soll steppen
+            {
+               digitalWriteFast(MD_STEP,LOW);
+            }
+         }
+         // Impuls A und B starten
+         
+         
+         
+         //Serial.printf("Motor A diagonal\t");
+      }
+      else 
+      {
+         // Schritt in schnelle Richtung, Parallelschritt
+         xB -= pdxB;
+         yB -= pdyB;
+         
+         if (xB)
+         {
+            if (pdxB && xB)// Motor C soll steppen
+            {
+               digitalWriteFast(MC_STEP,LOW);
+            }
+         }
+         if (yB)
+         {
+            if (pdyB && yB)// Motor D soll steppen
+            {
+               digitalWriteFast(MD_STEP,LOW);
+            }
+         }
+         
+         //Serial.printf("Motor A parallel\t");
+      }
+      bres_delayB = deltafastdelayB;
+
+      //end bres
       // Impuls starten
-      digitalWriteFast(MC_STEP,LOW);
-      CounterC=DelayC;                     // CounterC zuruecksetzen fuer neuen Impuls
+    //  digitalWriteFast(MC_STEP,LOW);
+    //  CounterC=DelayC;                     // CounterC zuruecksetzen fuer neuen Impuls
       
       
-      StepCounterC--;
+    //StepCounterC--;
       
       // Wenn StepCounterC abgelaufen und relevant: next Datenpaket abrufen
-      if (StepCounterC ==0 && (motorstatus & (1<< COUNT_C)))    // Motor A ist relevant fuer Stepcount 
+      if (bres_counterB ==0  )    //StepCounterC abgelaufen
       {
-         //Serial.printf("\nMotor C StepCounterC abgelaufen abschnittnummer: %d endposition: %d ringbufferstatus: %d  sendstatus: \n", abschnittnummer, endposition, ringbufferstatus,  sendstatus);
-         // Begin Ringbuffer-Stuff
-         //if (ringbufferstatus & (1<<ENDBIT))
-         
+         Serial.printf("Motor BC bres_counterB ist null\n");         
       //   sendstatus |= (1<<COUNT_C);
          
          if (abschnittnummer==endposition)
@@ -2696,7 +2797,7 @@ void loop()
             homestatus |= (1<<COUNT_C);
             }
 
-cli()
+            cli()
             Serial.printf("\nMotor C endpos\n");
             ringbufferstatus = 0;
             cncstatus=0;
@@ -2713,7 +2814,6 @@ cli()
             //sendbuffer[8]=ladeposition;
             
             sendbuffer[19] = motorstatus;
-            sendbuffer[20] = cncstatus;
             cncstatus=0;
             motorstatus=0;
             
@@ -2722,6 +2822,7 @@ cli()
             ringbufferstatus = 0;
             
             ladeposition=0;
+            analogWrite(DC_PWM, 0);
             interrupts();
          }
          else 
@@ -2732,7 +2833,7 @@ cli()
                aktuelleladeposition &= 0x03;
                
                // aktuellen Abschnitt laden
-                 aktuellelage = AbschnittLaden_4M(CNCDaten[aktuelleladeposition]);
+                 aktuellelage = AbschnittLaden_bres(CNCDaten[aktuelleladeposition]);
                
                if (aktuellelage==2) // war letzter Abschnitt
                {
@@ -2776,20 +2877,40 @@ cli()
    else
    {
       //STEPPERPORT_2 |= (1<<MC_STEP);               // Impuls an Motor C HI -> OFF
-      digitalWriteFast(MC_STEP,HIGH);
-      if (StepCounterC ==0)                     // Keine Steps mehr fuer Motor C
+      if (digitalReadFast(MC_STEP) == 0) //100 ns
       {
-         //Serial.printf("Motor C  StepCounterC 0");
-         //STEPPERPORT_2 |= (1<<MC_EN);                     // Motor C OFF
-         digitalWriteFast(MC_EN,HIGH);
+         //Serial.printf("step beenden\n"); 
+         digitalWriteFast(MC_STEP,HIGH);
       }
-   }
+      if (digitalReadFast(MD_STEP) == 0) //100 ns
+      {
+         
+         digitalWriteFast(MD_STEP,HIGH);
+      }
+
+      if ((xB == 0)  && (yB == 0))
+      {
+         if (digitalReadFast(MC_EN) == 0)
+         {
+            // Motoren ausschalten
+            Serial.printf("Motor C ausschalten\n"); 
+            digitalWriteFast(MC_EN,HIGH);
+         }
+         if (digitalReadFast(MD_EN) == 0)
+         {
+            // Motoren ausschalten
+            Serial.printf("Motor D ausschalten\n"); 
+            digitalWriteFast(MD_EN,HIGH);
+         }
+         
+         
+      }   }
    
 #pragma mark Motor D
    // **************************************
    // * Motor D *
    // **************************************
-   
+   /*
    if ((StepCounterD > 0) && (CounterD == 0)&&(!(anschlagstatus & (1<< END_D0))))
    {
       noInterrupts();
@@ -2886,7 +3007,7 @@ cli()
       }
       sei();
    }
- 
+ */
    
 #pragma mark sendstatus
    //if (sendstatus >= 3)
