@@ -1867,6 +1867,20 @@ void loop()
             Serial.printf("E0 Stop END\n");
          }break;
             
+            
+#pragma mark D2 zeichnen
+         case 0xD2:
+         {
+            uint16_t wegindex = (buffer[INDEX_BYTE_H] << 8) | buffer[INDEX_BYTE_L];
+            Serial.printf("D2 wegindex: %d\n",wegindex);
+            uint16_t x0 = (buffer[ACHSE0_BYTE_H] << 8) | buffer[ACHSE0_BYTE_H];
+            uint16_t y0 = (buffer[ACHSE1_BYTE_H] << 8) | buffer[ACHSE1_BYTE_H];
+            Serial.printf("D2 x0: %d y0: %d \n",x0,y0);
+         
+         }break;
+            
+            
+            
 #pragma mark E2 DC              
          case 0xE2: // DC_PWM ON_OFF: Temperatur Schneiddraht setzen
          {
