@@ -1146,21 +1146,19 @@ void AnschlagVonMotor(const uint8_t motor)
             sendbuffer[8]=ladeposition & 0x00FF;
             
             //
-            sendbuffer[20]=cncstatus;
+            sendbuffer[22]=cncstatus;
             
-            Serial.printf("*** Anschlag Home motor %d code: %d\n",motor, sendbuffer[0]);
+            Serial.printf("*** Anschlag Home motor %d code: %d cncstatus: %d\n",motor, sendbuffer[0],cncstatus);
             
             Serial.printf("E\n");
             uint8_t senderfolg = usb_rawhid_send((void*)sendbuffer, 10);
-            Serial.printf("*** Anschlag Home motor senderfolg %d\n",senderfolg);
-            for(uint8_t i=0;i<27;i++) // 5 us ohne printf, 10ms mit printf
+            Serial.printf("*** Anschlag Home motor senderfolg: %d\n",senderfolg);
+            for(uint8_t i=0;i<32;i++) // 5 us ohne printf, 10ms mit printf
             { 
                Serial.printf("%d \t",sendbuffer[i]);
             }
             Serial.printf("\n");
 
-            //ladeposition=0;
-            // motorstatus=0;
             
             richtung &= ~(1<<(RICHTUNG_A + motor)); // Richtung umschalten
             
@@ -1487,7 +1485,7 @@ void loop()
       }
 
       Serial.printf("\n");
-      
+      //sendbuffer[63]=0; // nur bei home auf 1 setzen
       sendbuffer[24] =  buffer[32];
       switch (code)
       {   
@@ -1739,7 +1737,7 @@ void loop()
                {
                sendbuffer[0]=0xB6;
                }
-               
+               sendbuffer[22] = cncstatus;
             }
             if (buffer[25]& 0x02)// letzter Abschnitt
             {
@@ -1851,7 +1849,7 @@ void loop()
             
             sendbuffer[8]=ladeposition & 0x00FF;
             // sendbuffer[7]=(ladeposition & 0xFF00) >> 8;
-            
+            sendbuffer[22] = cncstatus;
             
             usb_rawhid_send((void*)sendbuffer, 0);
             
@@ -2001,8 +1999,7 @@ void loop()
             
             // Strom OFF
             analogWrite(DC_PWM, 0);
-            
-            
+                        
             //abschnittnummer = 0; // diff 220520
             
             ladeposition=0;
@@ -2263,7 +2260,7 @@ void loop()
       ladeposition++;
       if (lage==2) // nur ein Abschnitt
       {
-         Serial.printf("Abschnitt 0 laden nur 1 Abschnitt\n");
+         Serial.printf("Abschnitt 0 laden nur 1 Abschnitt cncstatus: %d\n", cncstatus);
          ringbufferstatus |=(1<<ENDBIT); // unbenutzt
          ringbufferstatus |=(1<<LASTBIT);
       }
@@ -2448,7 +2445,7 @@ void loop()
             Serial.printf("Motor AB bres_counterA ist null\n");
             if ((abschnittnummer==endposition)) // Ablauf fertig
             {  
-               Serial.printf("*** *** *** *** *** *** Motor AB abschnittnummer==endposition xA: %d yA: %d\n",xA, yA);
+               Serial.printf("*** *** *** *** *** *** Motor AB abschnittnummer==endposition xA: %d yA: %d cncstatus: %d\n",xA, yA, cncstatus);
                if (cncstatus & (1<<GO_HOME))
                {
                   homestatus |= (1<<COUNT_A);
@@ -2457,7 +2454,6 @@ void loop()
        //        cli();
                Serial.printf("\nMotor A endpos > BD\n");
                ringbufferstatus = 0;
-               cncstatus=0;
                // home: 
                motorstatus &= ~(1<< COUNT_A);
                motorstatus=0;
@@ -2472,6 +2468,7 @@ void loop()
                ladeposition=0;
                
                analogWrite(DC_PWM, 0);
+               cncstatus=0;
          //      sei();
             }
             else 
@@ -2674,7 +2671,7 @@ void loop()
             
             if (abschnittnummer==endposition)
             {  
-               Serial.printf("*** *** *** *** *** *** Motor CD abschnittnummer==endposition xB: %d yB: %d\n",xB, yB);
+               Serial.printf("*** *** *** *** *** *** Motor CD abschnittnummer==endposition xB: %d yB: %d cncstatus: %d\n",xB, yB, cncstatus);
                
                if (cncstatus & (1<<GO_HOME))
                {
@@ -2685,7 +2682,6 @@ void loop()
                cli()
                Serial.printf("\nMotor C endpos > BD\n");
                ringbufferstatus = 0;
-               cncstatus=0;
                // home: 
                motorstatus &= ~(1<< COUNT_C);
                motorstatus=0;
