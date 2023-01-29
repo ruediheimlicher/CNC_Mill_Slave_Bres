@@ -72,7 +72,7 @@
 uint8_t loopLED;
 #define USB_DATENBREITE 64
 
-#define TEST 0
+#define TEST 1
 
 int8_t r;
 
@@ -217,22 +217,34 @@ volatile uint16_t          timerintervall_FAST = 0; // Intervall gross
 
 // Ramp
 
-volatile uint16_t          ramptimerintervall = TIMERINTERVALL;
+volatile uint16_t          ramptimerintervall = 2*TIMERINTERVALL;
 
 volatile uint8_t           rampstatus=0;
-volatile uint8_t           RampZeit = RAMPZEIT;
-volatile uint8_t           RampFaktor = RAMPFAKTOR;
+//volatile uint8_t           RampZeit = RAMPZEIT;
+//volatile uint8_t           RampFaktor = RAMPFAKTOR;
 volatile uint32_t          rampstepstart=0; // Stepcounter am Anfang
 volatile uint32_t          ramptimercounter=0;  // laufender counter  fuer Rampanpassung
-volatile uint32_t          ramptimerdelay = 200;  // Takt fuer Rampanpassung
+//volatile uint32_t          //ramptimerdelay = 100;  // Takt fuer Rampanpassung
+uint8_t                    rampschritt = 1;
 volatile uint16_t          rampbreite = 0;  // anzahl Schritte der Ramp. Wird beim Start bestimmt und fuer das Ende verwendet
 
 volatile uint32_t          rampendstep = 0; // Beginn der Endramp. Wird in Abschnittladen bestimmt
 
+uint8_t richtungstatus = 0;
+uint8_t oldrichtungstatus = 0;
+#define AXNEG  0
+#define AYNEG  1
+#define BXNEG  4
+#define BYNEG  5
+
+int16_t lastdax = 0; // letzte Werte fuer schritte x, y. Fuer berechnung gradient
+int16_t lastday = 0;
 
 // Create an IntervalTimer object 
 IntervalTimer              delayTimer;
 
+uint16_t errarray[1024];
+uint16_t errpos = 0;
 // Utilities
 // Ganssle
 
@@ -277,6 +289,11 @@ void OSZI_B_HI(void)
    if (TEST)
    digitalWriteFast(OSZI_PULS_B,HIGH);
 }
+void OSZI_B_TOGG(void)
+{
+   if (TEST)
+   digitalWrite(OSZI_PULS_B, !digitalRead(OSZI_PULS_B));
+}
 
 
 
@@ -284,6 +301,7 @@ void startTimer2(void)
 {
    timerstatus |= (1<<TIMER_ON);
 }
+
 void stopTimer2(void)
 {
    timerstatus &= ~(1<<TIMER_ON);
@@ -291,94 +309,23 @@ void stopTimer2(void)
 
 void delaytimerfunction(void) // 1us ohne ramp
 { 
-  // digitalWrite(OSZI_PULS_A, !digitalRead(OSZI_PULS_A));
-   
+   //OSZI_A_TOGG(); // 100us
    if (timerstatus & (1<<TIMER_ON))
    {
-      
-      
-      
+      // OSZI_A_LO(); // 100us
       
       if (bres_delayA)
       {
          bres_delayA-=1;
       }
-
+      
       if (bres_delayB)
       {
          bres_delayB-=1;
       }
-      
-      
-      return;
-      
-      
-      //OSZI_A_LO();
-       
+   } 
       //OSZI_A_HI();
-     
-      {
-         ramptimercounter += 1;
-         
-         //      Serial.printf("start rampstatus: %d",rampstatus);
-         //      rampstatus = 0;
-         
-         if (ramptimercounter > ramptimerdelay) // Teiler, 200us
-         {
-            ramptimercounter = 0;
-            if (rampstatus & (1<<RAMPSTARTBIT))
-            {
-               if (ramptimerintervall > timerintervall_FAST) // noch nicht auf max speed
-               {
-                  //  Serial.printf("start ramptimerintervall: %d\n",ramptimerintervall);
-                  ramptimerintervall -= RAMPSCHRITT;
-                  delayTimer.update(ramptimerintervall);
-                  rampbreite++;
-               }
-               else
-               {
-                  
-                  rampstatus &= ~(1<<RAMPSTARTBIT);
-                  rampendstep = rampstepstart - max(StepCounterA, StepCounterB);
-                  rampstatus |= (1<<RAMPENDBIT);
-                  rampstatus |= (1<<RAMPEND0BIT);
-                  // Serial.printf("start rampstepstart: %d rampendstep: %d ramptimerintervall: %d timerintervall: %d\n",rampstepstart,rampendstep, ramptimerintervall,timerintervall);
-                  
-               }
-            }
-            if (rampstatus & (1<<RAMPENDBIT))
-            {
-               
-               if (max(StepCounterA, StepCounterB) < rampendstep)
-               {
-                  //Serial.printf("end StepCounterA: %d\n",StepCounterA);
-                  // ramptimerintervall ist timerintervall_FAST
-                  if (rampstatus & (1<<RAMPEND0BIT))
-                  {
-                     //Serial.printf("rampend0:  rampendstep: %d StepCounterA: %d StepCounterB: %d ramptimerintervall: %d timerintervall: %d timerintervall_SLOW: %d\n",rampendstep, StepCounterA,StepCounterB,ramptimerintervall,timerintervall,timerintervall_SLOW);
-                     
-                     rampstatus &= ~(1<<RAMPEND0BIT);
-                  }
-                  if (ramptimerintervall < timerintervall_SLOW)
-                  {
-                     //Serial.printf("end StepCounterA: %d ramptimerintervall: %d\n",StepCounterA,ramptimerintervall);
-                     ramptimerintervall += RAMPSCHRITT;
-                     
-                     delayTimer.update(ramptimerintervall);
-                     //rampbreite++;
-                  }
-                  
-               }
-               
-            } // if RAMPENDBIT
-         }
-      }
-      
-   } // if timerstatus
-   
-   //digitalWrite(OSZI_PULS_A, !digitalRead(OSZI_PULS_A));
-   // TCNT2 = 10;                     // ergibt 2 kHz fuer Timertakt
-    
+
 }
 
 uint8_t  AbschnittLaden_4M(const uint8_t* AbschnittDaten) // 22us
@@ -679,13 +626,16 @@ uint8_t  AbschnittLaden_bres(const uint8_t* AbschnittDaten) // 22us
    
    micro = AbschnittDaten[26];
    
+   uint16_t index = (AbschnittDaten[18] << 8) | AbschnittDaten[19];
    // pwm-rate
    PWM = AbschnittDaten[20];
    //Serial.printf("AbschnittLaden_4M steps: %d micro: %d PWM: %d\n",steps,micro,PWM);
    //Serial.printf("AbschnittLaden_bres start \n");
    analogWrite(DC_PWM, PWM);
    
-   Serial.printf("AbschnittLaden_bres AbschnittDaten eingang\n");
+   Serial.printf("AbschnittLaden_bres AbschnittDaten eingang index: %d\n", index);
+   
+   
    /*
    for(uint8_t i=0;i<27;i++) // 5 us ohne printf, 10ms mit printf
    { 
@@ -726,10 +676,12 @@ uint8_t  AbschnittLaden_bres(const uint8_t* AbschnittDaten) // 22us
    dataH=AbschnittDaten[1];
    
    //lcd_gotoxy(17,0);
+   int8_t vz = 1;
    if (dataH & (0x80)) // Bit 7 gesetzt, negative zahl
    {
       richtung |= (1<<RICHTUNG_A); // Rueckwarts
       digitalWriteFast(MA_RI, LOW); // PIN fuer Treiber stellen
+      vz = -1;
       //lcd_putc('r');
    }
    else 
@@ -740,17 +692,16 @@ uint8_t  AbschnittLaden_bres(const uint8_t* AbschnittDaten) // 22us
    }
    
    dataH &= (0x7F); // bit 8 entfernen
-   StepCounterA = dataL | (dataH << 8);      // 
-   
+   StepCounterA = dataL | (dataH << 8);      //    
+
+   int16_t newdax =  StepCounterA * vz;
    StepCounterA *= micro;
    StepStartA = StepCounterA;
       
    delayL=AbschnittDaten[4];
    delayH=AbschnittDaten[5];
    
-   
    DelayA = delayL | (delayH << 8);
-   
    
    CounterA = DelayA;
    
@@ -760,11 +711,12 @@ uint8_t  AbschnittLaden_bres(const uint8_t* AbschnittDaten) // 22us
    dataL=AbschnittDaten[2];
    dataH=AbschnittDaten[3];
    //lcd_gotoxy(19,1);
-   
+   vz = 1;
    if (dataH & (0x80)) // Bit 7 gesetzt, negative zahl
    {
       richtung |= (1<<RICHTUNG_B); // Rueckwarts
       digitalWriteFast(MB_RI, LOW);      //lcd_putc('r');
+      vz = -1;
    }
    else 
    {
@@ -775,15 +727,49 @@ uint8_t  AbschnittLaden_bres(const uint8_t* AbschnittDaten) // 22us
    dataH &= (0x7F);
     
    StepCounterB = dataL | (dataH <<8);
+   int16_t newday = StepCounterB * vz;
+   
    StepCounterB *= micro;
    
    
     DelayB = (AbschnittDaten[7]<<8) | AbschnittDaten[6];
    
    
-   Serial.printf("\nAbschnittLaden_bres StepCounterA: %d DelayA: %d StepCounterB: %d DelayB: %d\n",StepCounterA, DelayA, StepCounterB, DelayB);
+   Serial.printf("\nAbschnittLaden_bres index: %d StepCounterA  : %d DelayA: %d StepCounterB: %d DelayB: %d\n",index,StepCounterA, DelayA, StepCounterB, DelayB);
 
+   
    CounterB = DelayB;
+   if(index)
+   {
+      Serial.printf("+++ +++ +++ +++ +++ +++ +++ +++ +++ +++   \n");
+      Serial.printf("\tlastdax: %d lastday: %d newdax: %d newday: %d \n",lastdax,lastday,newdax,newday);
+      
+      float skalarproda =  lastdax * newdax + lastday*newday; // vektoren: (lastax,lastay), (newax,neway)
+      Serial.printf("AbschnittLaden_bres skalarproda: %.0f\n",skalarproda);
+      
+      float lasthypa = hypotf(lastdax,lastday);
+      float newhypa = hypotf(newdax,newday);
+      float nennera = newhypa * lasthypa;
+      Serial.printf("AbschnittLaden_bres lasthypa: %.0f newhypa: %.0f nennera: %.0f\n",lasthypa,newhypa,nennera);
+      float cos = skalarproda / nennera;
+      if (abs(cos > 0.9))
+      {
+         Serial.printf("AbschnittLaden_bres ramp start\n");
+         //rampstatus |=(1<<RAMPOKBIT);
+      }
+      else 
+      {
+         
+      }
+      float arc = acos(cos);
+      float cosdegree = arc/M_PI * 180;
+      Serial.printf("AbschnittLaden_bres cos: %.4f arc: %.4f cosdegree: %.2f\n",cos, arc, cosdegree);
+     
+      lastdax = newdax;
+      lastday = newday;
+      
+      Serial.printf("+++ +++ +++ +++ +++ +++ +++ +++ +++ +++   \n");
+   }
    
    
    // Motor C
@@ -873,7 +859,7 @@ uint8_t  AbschnittLaden_bres(const uint8_t* AbschnittDaten) // 22us
    //  ****
    //  Bresenham
    //  ***
-   Serial.printf("AbschnittLaden_bres vor bresenham: StepCounterA: %d StepCounterB: %d\n",StepCounterA,StepCounterB);
+   //Serial.printf("AbschnittLaden_bres vor bresenham: StepCounterA: %d StepCounterB: %d\n",StepCounterA,StepCounterB);
    deltafastdirectionA = 0;
    deltaslowdirectionA = 0;
    deltafastdirectionB = 0;
@@ -912,12 +898,20 @@ uint8_t  AbschnittLaden_bres(const uint8_t* AbschnittDaten) // 22us
    bres_delayA = deltafastdelayA; // aktueller delay in fastdir
    bres_counterA = deltafastdirectionA; // aktueller counter fuer steps
    
+   //ramptimerintervall = 128;
+   if(rampstatus & (1<<RAMPOKBIT))
+   {
+      rampstatus |= (1<<RAMPSTARTBIT);
+      errpos = 0;
+      delayTimer.update(ramptimerintervall*2);
+   }
+   
    xA = StepCounterA; // 
    yA = StepCounterB;
 
    errA = deltafastdirectionA/2;
    
-   //Serial.printf("AbschnittLaden_bres deltafastdirectionA: %d deltaslowdirectionA: %d  deltafastdelayA: %d errA: %d bres_counterA: %d bres_delayA: %d\n",deltafastdirectionA,deltaslowdirectionA, deltafastdelayA,errA,bres_counterA,bres_delayA);
+  // Serial.printf("AbschnittLaden_bres deltafastdirectionA: %d deltaslowdirectionA: %d  deltafastdelayA: %d errA: %d bres_counterA: %d bres_delayA: %d\n",deltafastdirectionA,deltaslowdirectionA, deltafastdelayA,errA,bres_counterA,bres_delayA);
 
    // bresenham Seite B
    
@@ -959,14 +953,92 @@ uint8_t  AbschnittLaden_bres(const uint8_t* AbschnittDaten) // 22us
    
    //Serial.printf("AbschnittLaden_bres deltafastdirectionB: %d deltaslowdirectionB: %d  deltafastdelayB: %d errB: %d  bres_counterB: %d bres_delayB:%d\n",deltafastdirectionB,deltaslowdirectionB, deltafastdelayB,errB,bres_counterB,bres_delayB);
 
-
+   if (deltafastdirectionA <180) // kleiner Bereich, ca 4mm
+   {
+      Serial.printf("AbschnittLaden_bres index %d kleiner Weg deltafastdirectionA: %d\n",index,deltafastdirectionA);
+      rampschritt = 20;
+      ramptimerintervall = TIMERINTERVALL/4;
+      rampstatus |= (1<<RAMPSTARTBIT);
+      timerintervall_FAST = TIMERINTERVALL;
+   }
+   {
+   Serial.printf("AbschnittLaden_bres ramp start\n");
+   rampstatus |= (1<<RAMPSTARTBIT);
+   ramptimerintervall = 2*TIMERINTERVALL;
+   
+   timerintervall_FAST = TIMERINTERVALL;
+   //  OSZI_B_LO();
+}
+   
    
    // motorstatus: welcher Motor ist relevant
    motorstatus = AbschnittDaten[21];
    
+   // richtung change
+#pragma mark Richtung change
+   
+   
+   
+   // richtungswechsel bestimmen
+   //uint8_t oldrichtungstatus = richtungstatus; // vorherige Runde
+   richtungstatus = 0;
+   if(CNCDaten[ladeposition][1] > 127) // richtung ax negativ
+   {
+      richtungstatus |= (1<<AXNEG); // set
+   }
+   else
+   {
+      richtungstatus &= ~(1<<AXNEG); // reset
+   }
+   if(CNCDaten[ladeposition][3] > 127) // richtung ax negativ
+   {
+      richtungstatus |= (1<<AYNEG);
+   }
+   else
+   {
+      richtungstatus &= ~(1<<AYNEG); // reset
+   }
+
+   if(CNCDaten[ladeposition][9] > 127) // richtung bx negativ
+   {
+      richtungstatus |= (1<<BXNEG);
+   }
+   else
+   {
+      richtungstatus &= ~(1<<BXNEG); // reset
+   }
+
+   if(CNCDaten[ladeposition][11] > 127) // richtung by negativ
+   {
+      richtungstatus |= (1<<BYNEG);
+   }
+   else
+   {
+      richtungstatus &= ~(1<<BYNEG); // reset
+   }
+
+   if (oldrichtungstatus ^ richtungstatus)
+   {
+      Serial.printf("++++++++++++++++++++++++++   abschnittnummer: %d richtungstatus geaendert: oldrichtungstatus: %d richtungstatus: %d change: %d\n",abschnittnummer,oldrichtungstatus,richtungstatus,(oldrichtungstatus ^ richtungstatus) );
+      oldrichtungstatus = richtungstatus; // vorherige Runde
+      
+         rampstatus |=(1<<RAMPOKBIT);
+   }
+   else 
+   {
+      rampstatus &= ~(1<<RAMPOKBIT);
+   }
+   //
+   
+   
+   
+   
    startTimer2();
    
    //Serial.printf("\nAbschnittLaden_bres end aktuellelage: %d \n",returnwert);
+   
+   
+   
     return returnwert;
  
 }
@@ -1372,6 +1444,9 @@ void setup()
    {
       pinMode(OSZI_PULS_A, OUTPUT);
       digitalWriteFast(OSZI_PULS_A, HIGH); 
+      pinMode(OSZI_PULS_B, OUTPUT);
+      digitalWriteFast(OSZI_PULS_B, HIGH); 
+
    }
    
     
@@ -1380,7 +1455,7 @@ void setup()
    delay(100);
    lcd.backlight();
    
-   rampstatus |=(1<<RAMPOKBIT);
+  //rampstatus |=(1<<RAMPOKBIT);
    
    //lcd.setCursor(0,0);
    //lcd.print("hallo");
@@ -1503,7 +1578,7 @@ void loop()
       uint8_t device = buffer[32];
       
       Serial.printf("\n----------------------------------->    rawhid_recv code: %02X device: %d\n",code, device);
-      for(uint8_t i=0;i<32;i++) // 5 us ohne printf, 10ms mit printf
+      for(uint8_t i=0;i<36;i++) // 5 us ohne printf, 10ms mit printf
       { 
          Serial.printf("%d \t",buffer[i]);
       }
@@ -1548,7 +1623,6 @@ void loop()
             }
             AbschnittLaden_4M(buffer);
          }break;
-            
 #pragma mark B1    
          case 0xB1:
          {
@@ -1577,8 +1651,6 @@ void loop()
             //          usb_rawhid_send((void*)sendbuffer, 0);
             
          }break;
-             
-            
 #pragma mark B3       
          case 0xB3: // sendTextdaten
          {
@@ -1602,7 +1674,7 @@ void loop()
             
             // Lage:
             
-            uint8_t lage = buffer[17];
+            uint8_t lage = buffer[25];
             
             Serial.printf("B3 abschnittnummer: %d\tbuffer25 lage: %d \t device: %d\n",abschnittnummer,lage,buffer[32]);
             //             Serial.printf("count: %d\n",buffer[22]);
@@ -1694,13 +1766,12 @@ void loop()
              {
              Serial.printf("%d\t",i);
              }
-             
              */
             //Serial.printf("\n");
             //OSZI_A_LO();
             //              Serial.printf("default: abschnittnummer: %d pos: %d\n",abschnittnummer,pos);
             //for(i=0;i<USB_DATENBREITE;i++) // 5 us ohne printf, 10ms mit printf
-            for(uint8_t i=0;i<64;i++) // 5 us ohne printf, 10ms mit printf
+            for(i=0;i<64;i++) // 5 us ohne printf, 10ms mit printf
             { 
                //                 Serial.printf("%d \t",buffer[i]);
                
@@ -2198,9 +2269,7 @@ void loop()
                }
             }
             
-            
-            
-            // Daten vom buffer in CNCDaten laden
+             // Daten vom buffer in CNCDaten laden
             {
                uint8_t pos=(abschnittnummer);
                pos &= 0x03; // 2 bit // Beschraenkung des index auf Buffertiefe 
@@ -2228,11 +2297,7 @@ void loop()
                   //versionl=VERSION & 0xFF;
                   //versionh=((VERSION >> 8) & 0xFF);
                   
-                  
-                  
-                  
-                  
-                  sendbuffer[5]=abschnittnummer;
+                    sendbuffer[5]=abschnittnummer;
                   sendbuffer[6]=ladeposition;
                   sendbuffer[0]=0xAF;
                   usb_rawhid_send((void*)sendbuffer, 0);
@@ -2288,7 +2353,8 @@ void loop()
       ringbufferstatus &= ~(1<<STARTBIT);  // Startbit entfernen      
       ladeposition=0;  // laufender Zaehler fuer Ringbuffer, gefiltert mit Ringbuffertiefe
       AbschnittCounter=0;
-      
+      richtungstatus = 0; // neubeginn, set back
+      oldrichtungstatus = 0;
       // Abschnitt 0 laden
       uint8_t l = sizeof(CNCDaten[ladeposition]);
       uint8_t micro = CNCDaten[ladeposition][26];
@@ -2300,7 +2366,26 @@ void loop()
       
       uint8_t lage=AbschnittLaden_bres(CNCDaten[ladeposition]); // erster Wert im Ringbuffer
       
-      Serial.printf("+++ Erster Abschnitt lage nach AbschnittLaden_bres: %d\n",lage);
+      // Gradient
+      int8_t vz = 1 ;// vorzeichen
+      uint8_t axh = CNCDaten[ladeposition][1]; // hi byte
+      if(axh & 0x80) // bit8, vz
+      {
+         vz = -1;
+      }
+      lastdax = ( CNCDaten[ladeposition][0] | ((CNCDaten[ladeposition][1] & 0x7F) <<8)) * vz;
+     
+      vz = 1;
+      uint8_t ayh = CNCDaten[ladeposition][3]; // hi byte
+      if(ayh & 0x80) // bit8, vz
+      {
+         vz = -1;
+      }
+      lastday = (CNCDaten[ladeposition][2] | ((CNCDaten[ladeposition][3] & 0x7F) <<8)) * vz;
+      
+      Serial.printf("\n+++ \nErster Abschnitt lastdax: %d lastday: %d \n",lastdax,lastday);
+      
+      //Serial.printf("+++ Erster Abschnitt lage nach AbschnittLaden_bres: %d\n",lage);
       ladeposition++;
       if (lage==2) // nur ein Abschnitt
       {
@@ -2314,12 +2399,61 @@ void loop()
       
       //      startTimer2();
       //      Serial.printf("motorstatus: %d\n",motorstatus);
-   }
+      Serial.printf("+++   +++   +++    Erster Abschnitt end\n");
+   }//Ersten Abschnitt laden
+ 
+   /*
+#pragma mark Richtung change
    
-#pragma mark Anschlag
+   // richtungswechsel bestimmen
+   //uint8_t oldrichtungstatus = richtungstatus; // vorherige Runde
+   //richtungstatus = 0;
+   if(CNCDaten[ladeposition][1] > 127) // richtung ax negativ
+   {
+      richtungstatus |= (1<<AXNEG); // set
+   }
+   else
+   {
+      richtungstatus &= ~(1<<AXNEG); // reset
+   }
+   if(CNCDaten[ladeposition][3] > 127) // richtung ax negativ
+   {
+      richtungstatus |= (1<<AYNEG);
+   }
+   else
+   {
+      richtungstatus &= ~(1<<AYNEG); // reset
+   }
+
+   if(CNCDaten[ladeposition][9] > 127) // richtung bx negativ
+   {
+      richtungstatus |= (1<<BXNEG);
+   }
+   else
+   {
+      richtungstatus &= ~(1<<BXNEG); // reset
+   }
+
+   if(CNCDaten[ladeposition][11] > 127) // richtung by negativ
+   {
+      richtungstatus |= (1<<BYNEG);
+   }
+   else
+   {
+      richtungstatus &= ~(1<<BYNEG); // reset
+   }
+
+   if (oldrichtungstatus ^ richtungstatus)
+   {
+      Serial.printf("++++++++++++++++++++++++++   abschnittnummer: %d richtungstatus geaendert: oldrichtungstatus: %d richtungstatus: %d change: %d\n",abschnittnummer,oldrichtungstatus,richtungstatus,(oldrichtungstatus ^ richtungstatus) );
+      oldrichtungstatus = richtungstatus; // vorherige Runde
+   }
+   // end richtung change
+   */
    
    //sendbuffer[0]=0;
-   
+#pragma mark Anschlag
+      
    // Anschlagsituation abfragen
 #pragma mark Anschlag   Motor A
    // ********************
@@ -2413,9 +2547,47 @@ void loop()
    
    if (deltafastdirectionA > 0) // Bewegung auf Seite A vorhanden
    {
+      //Serial.printf("abschnittnummer: %d richtungstatus: %d\n",abschnittnummer,richtungstatus);
       // Es hat noch Steps, bres_delayA ist abgezaehlt (bres_delayA bestimmt Impulsabstand fuer Steps)
       if ((bres_counterA > 0)  && (bres_delayA == 0) &&((!(anschlagstatus & (1<< END_A0))) && (!(anschlagstatus & (1<< END_B0)))) )        
       {
+         // start ramp
+         
+         if (rampstatus & (1<<RAMPSTARTBIT))
+         {
+            //errarray[errpos++] = ramptimerintervall;
+            if (ramptimerintervall > timerintervall_FAST) // noch nicht auf max speed
+            {
+               //errarray[errpos++] = ramptimerintervall;
+               //  Serial.printf("start ramptimerintervall: %d\n",ramptimerintervall);
+               if(rampstatus & (1<<RAMPOKBIT))
+               {
+                  ramptimerintervall -= RAMPSCHRITT;
+                  
+                  delayTimer.update(ramptimerintervall);
+                  rampbreite++;
+
+               }
+
+             }
+            else
+            {
+               //OSZI_B_HI();
+               //errarray[errpos++] = 1000;
+               rampstatus &= ~(1<<RAMPSTARTBIT);
+               rampendstep = rampstepstart - max(StepCounterA, StepCounterB);
+               rampstatus |= (1<<RAMPENDBIT);
+               rampstatus |= (1<<RAMPEND0BIT);
+                //Serial.printf("end rampstepstart: %d rampendstep: %d ramptimerintervall: %d timerintervall: %d\n",rampstepstart,rampendstep, ramptimerintervall,timerintervall);
+               Serial.printf("end ramp\n");
+               rampstatus &= ~(1<<RAMPOKBIT);
+            }
+         }
+
+         
+         // end ramp
+         
+         
    //      noInterrupts();
          //
          // Aktualisierung Fehlerterm
@@ -2514,6 +2686,13 @@ void loop()
                
                analogWrite(DC_PWM, 0);
                cncstatus=0;
+               /*
+               for (uint16_t i=0;i<255;i++)
+               {
+                  
+                  Serial.printf("%d\t%d \n",i,errarray[i]);
+               }
+*/
          //      sei();
             }
             else 
@@ -2535,7 +2714,7 @@ void loop()
                }
                else 
                {
-                  Serial.printf("richtung x negativ\n");
+                  Serial.printf("richtung x positiv\n");
                }
                
           //     Serial.printf("Motor AB: aktuellelage code vor: %d\nAbschnittdaten vor Funktion: \n",CNCDaten[aktuelleladeposition][17]);
@@ -2544,6 +2723,8 @@ void loop()
                 //  Serial.printf("%d \t",CNCDaten[aktuelleladeposition][i]);
                }
                //Serial.printf("\n");
+               
+               
                
                aktuellelage = AbschnittLaden_bres(CNCDaten[aktuelleladeposition]); 
                
@@ -2562,7 +2743,7 @@ void loop()
                   //sendbuffer[7]=(ladeposition & 0xFF00) >> 8;
                   sendbuffer[22] = cncstatus;
                   usb_rawhid_send((void*)sendbuffer, 0);
-                 // sei();
+                  // sei();
                   
                }
                else

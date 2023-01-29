@@ -118,7 +118,7 @@
 
 
 #define OSZI_PULS_A        8
-#define OSZI_PULS_B        9
+#define OSZI_PULS_B        7
 
 
 #define THREAD_COUNT_BIT   0
@@ -134,7 +134,7 @@
 #define RAMPENDBIT 2
 #define RAMPEND0BIT 3 // Beginn der Endrampe
 #define RAMPOKBIT    7
-#define RAMPSCHRITT  10
+#define RAMPSCHRITT  1
 
 
 #define DEVICE_MILL  1
