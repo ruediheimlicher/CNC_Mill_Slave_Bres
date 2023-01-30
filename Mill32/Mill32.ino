@@ -741,6 +741,7 @@ uint8_t  AbschnittLaden_bres(const uint8_t* AbschnittDaten) // 22us
    CounterB = DelayB;
    if(index)
    {
+      /*
       Serial.printf("+++ +++ +++ +++ +++ +++ +++ +++ +++ +++   \n");
       Serial.printf("\tlastdax: %d lastday: %d newdax: %d newday: %d \n",lastdax,lastday,newdax,newday);
       
@@ -769,7 +770,8 @@ uint8_t  AbschnittLaden_bres(const uint8_t* AbschnittDaten) // 22us
       lastday = newday;
       
       Serial.printf("+++ +++ +++ +++ +++ +++ +++ +++ +++ +++   \n");
-   }
+       */
+   } // if index
    
    
    // Motor C
@@ -1022,7 +1024,7 @@ uint8_t  AbschnittLaden_bres(const uint8_t* AbschnittDaten) // 22us
       Serial.printf("++++++++++++++++++++++++++   abschnittnummer: %d richtungstatus geaendert: oldrichtungstatus: %d richtungstatus: %d change: %d\n",abschnittnummer,oldrichtungstatus,richtungstatus,(oldrichtungstatus ^ richtungstatus) );
       oldrichtungstatus = richtungstatus; // vorherige Runde
       
-         rampstatus |=(1<<RAMPOKBIT);
+         //rampstatus |=(1<<RAMPOKBIT);
    }
    else 
    {
