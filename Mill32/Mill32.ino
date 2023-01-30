@@ -963,6 +963,7 @@ uint8_t  AbschnittLaden_bres(const uint8_t* AbschnittDaten) // 22us
       rampstatus |= (1<<RAMPSTARTBIT);
       timerintervall_FAST = TIMERINTERVALL;
    }
+   
    {
    Serial.printf("AbschnittLaden_bres ramp start\n");
    rampstatus |= (1<<RAMPSTARTBIT);
@@ -979,8 +980,8 @@ uint8_t  AbschnittLaden_bres(const uint8_t* AbschnittDaten) // 22us
    // richtung change
 #pragma mark Richtung change
    
-   
-   
+   rampstatus |=(1<<RAMPOKBIT);
+   /*
    // richtungswechsel bestimmen
    //uint8_t oldrichtungstatus = richtungstatus; // vorherige Runde
    richtungstatus = 0;
@@ -1032,7 +1033,7 @@ uint8_t  AbschnittLaden_bres(const uint8_t* AbschnittDaten) // 22us
    }
    //
    
-   
+   */
    
    
    startTimer2();
@@ -1457,7 +1458,7 @@ void setup()
    delay(100);
    lcd.backlight();
    
-  //rampstatus |=(1<<RAMPOKBIT);
+  rampstatus |=(1<<RAMPOKBIT);
    
    //lcd.setCursor(0,0);
    //lcd.print("hallo");
