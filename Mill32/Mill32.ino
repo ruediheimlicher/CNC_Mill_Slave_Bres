@@ -633,7 +633,7 @@ uint8_t  AbschnittLaden_bres(const uint8_t* AbschnittDaten) // 22us
    //Serial.printf("AbschnittLaden_bres start \n");
    analogWrite(DC_PWM, PWM);
    
-   Serial.printf("AbschnittLaden_bres AbschnittDaten eingang index: %d\n", index);
+   Serial.printf("\nAbschnittLaden_bres AbschnittDaten eingang index: %d\n", index);
    
    
    /*
@@ -694,7 +694,7 @@ uint8_t  AbschnittLaden_bres(const uint8_t* AbschnittDaten) // 22us
    dataH &= (0x7F); // bit 8 entfernen
    StepCounterA = dataL | (dataH << 8);      //    
 
-   int16_t newdax =  StepCounterA * vz;
+   int16_t newdax =  StepCounterA ;//* vz;
    StepCounterA *= micro;
    StepStartA = StepCounterA;
       
@@ -727,7 +727,7 @@ uint8_t  AbschnittLaden_bres(const uint8_t* AbschnittDaten) // 22us
    dataH &= (0x7F);
     
    StepCounterB = dataL | (dataH <<8);
-   int16_t newday = StepCounterB * vz;
+   int16_t newday = StepCounterB ;// * vz;
    
    StepCounterB *= micro;
    
@@ -735,40 +735,56 @@ uint8_t  AbschnittLaden_bres(const uint8_t* AbschnittDaten) // 22us
     DelayB = (AbschnittDaten[7]<<8) | AbschnittDaten[6];
    
    
-   Serial.printf("\nAbschnittLaden_bres index: %d StepCounterA  : %d DelayA: %d StepCounterB: %d DelayB: %d\n",index,StepCounterA, DelayA, StepCounterB, DelayB);
+   Serial.printf("\tAbschnittLaden_bres index: %d StepCounterA  : %d DelayA: %d StepCounterB: %d DelayB: %d\n",index,StepCounterA, DelayA, StepCounterB, DelayB);
 
    
    CounterB = DelayB;
+   
+   
    if(index)
    {
-      Serial.printf("+++ +++ +++ +++ +++ +++ +++ +++ +++ +++   \n");
-      Serial.printf("\tlastdax: %d lastday: %d newdax: %d newday: %d \n",lastdax,lastday,newdax,newday);
+      /*
+      Serial.printf("\t+++ +++ +++ +++ +++ +++ +++ +++ +++ +++  cos start \n");
+      Serial.printf("\tlastdax: %u lastday: %u newdax: %u newday: %u \n",lastdax,lastday,newdax,newday);
       
       float skalarproda =  lastdax * newdax + lastday*newday; // vektoren: (lastax,lastay), (newax,neway)
-      Serial.printf("AbschnittLaden_bres skalarproda: %.0f\n",skalarproda);
-      
+      Serial.printf("\tAbschnittLaden_bres skalarproda: %.0f\n",skalarproda);
+     
       float lasthypa = hypotf(lastdax,lastday);
+     
       float newhypa = hypotf(newdax,newday);
+     
       float nennera = newhypa * lasthypa;
-      Serial.printf("AbschnittLaden_bres lasthypa: %.0f newhypa: %.0f nennera: %.0f\n",lasthypa,newhypa,nennera);
+      Serial.printf("\tAbschnittLaden_bres lasthypa: %.0f newhypa: %.0f nennera: %.0f\n",lasthypa,newhypa,nennera);
+      
       float cos = skalarproda / nennera;
-      if (abs(cos > 0.9))
+      if (abs(cos) > 0)
       {
-         Serial.printf("AbschnittLaden_bres ramp start\n");
-         //rampstatus |=(1<<RAMPOKBIT);
+         if (abs(cos > 0.9))
+         {
+            Serial.printf("\t\tAbschnittLaden_bres ramp start\n");
+            //rampstatus |=(1<<RAMPOKBIT);
+         }
+         else 
+         {
+            
+         }
+         float arc = acos(cos);
+         float cosdegree = arc/M_PI * 180;
+         
+         
+         Serial.printf("\tAbschnittLaden_bres cos: %.4f arc: %.4f cosdegree: %.2f\n",cos, arc, cosdegree);
       }
       else 
       {
-         
+         Serial.printf("\tAbschnittLaden_bres cos ist 0\n");
       }
-      float arc = acos(cos);
-      float cosdegree = arc/M_PI * 180;
-      Serial.printf("AbschnittLaden_bres cos: %.4f arc: %.4f cosdegree: %.2f\n",cos, arc, cosdegree);
-     
+       
       lastdax = newdax;
       lastday = newday;
       
-      Serial.printf("+++ +++ +++ +++ +++ +++ +++ +++ +++ +++   \n");
+      Serial.printf("+++ +++ +++ +++ +++ +++ +++ +++ +++ +++  cos end \n");
+       */
    }
    
    
@@ -1022,14 +1038,14 @@ uint8_t  AbschnittLaden_bres(const uint8_t* AbschnittDaten) // 22us
       Serial.printf("++++++++++++++++++++++++++   abschnittnummer: %d richtungstatus geaendert: oldrichtungstatus: %d richtungstatus: %d change: %d\n",abschnittnummer,oldrichtungstatus,richtungstatus,(oldrichtungstatus ^ richtungstatus) );
       oldrichtungstatus = richtungstatus; // vorherige Runde
       
-         rampstatus |=(1<<RAMPOKBIT);
+         //rampstatus |=(1<<RAMPOKBIT);
    }
    else 
    {
       rampstatus &= ~(1<<RAMPOKBIT);
    }
-   //
    
+   richtungstatus = 0;
    
    
    
@@ -2366,6 +2382,7 @@ void loop()
       
       uint8_t lage=AbschnittLaden_bres(CNCDaten[ladeposition]); // erster Wert im Ringbuffer
       
+      
       // Gradient
       int8_t vz = 1 ;// vorzeichen
       uint8_t axh = CNCDaten[ladeposition][1]; // hi byte
@@ -2373,7 +2390,7 @@ void loop()
       {
          vz = -1;
       }
-      lastdax = ( CNCDaten[ladeposition][0] | ((CNCDaten[ladeposition][1] & 0x7F) <<8)) * vz;
+      lastdax = ( CNCDaten[ladeposition][0] | ((CNCDaten[ladeposition][1] & 0x7F) <<8)) ;//* vz;
      
       vz = 1;
       uint8_t ayh = CNCDaten[ladeposition][3]; // hi byte
@@ -2381,9 +2398,9 @@ void loop()
       {
          vz = -1;
       }
-      lastday = (CNCDaten[ladeposition][2] | ((CNCDaten[ladeposition][3] & 0x7F) <<8)) * vz;
+      lastday = (CNCDaten[ladeposition][2] | ((CNCDaten[ladeposition][3] & 0x7F) <<8));// * vz;
       
-      Serial.printf("\n+++ \nErster Abschnitt lastdax: %d lastday: %d \n",lastdax,lastday);
+      Serial.printf("\n+++ \nErster Abschnitt lastdax: %u lastday: %u vz: %u\n",lastdax,lastday,vz);
       
       //Serial.printf("+++ Erster Abschnitt lage nach AbschnittLaden_bres: %d\n",lage);
       ladeposition++;
@@ -2697,11 +2714,12 @@ void loop()
             }
             else 
             {
+               Serial.printf("*** *** *** *** *** *** Motor AB abschnittnummer NOT endposition ladeposition: %d\n",ladeposition);
                uint8_t aktuellelage=0; // Lage innerhalb der Abschnittserie: Start: 1, Innerhalb: 0, Ende: 2
                
                uint8_t aktuelleladeposition=(ladeposition & 0x00FF); // 8 bit
                aktuelleladeposition &= 0x03;
-               
+               Serial.printf(" aktuelleladeposition nach filter:: %d\n",aktuelleladeposition);
                // aktuellen Abschnitt laden
                //_delay_us(5);
                
@@ -2714,15 +2732,15 @@ void loop()
                }
                else 
                {
-                  Serial.printf("richtung x positiv\n");
+                  Serial.printf("richtung x negativ\n");
                }
                
           //     Serial.printf("Motor AB: aktuellelage code vor: %d\nAbschnittdaten vor Funktion: \n",CNCDaten[aktuelleladeposition][17]);
-               for(uint8_t i=0;i<27;i++) // 5 us ohne printf, 10ms mit printf
+               for(uint8_t i=0;i<37;i++) // 5 us ohne printf, 10ms mit printf
                { 
-                //  Serial.printf("%d \t",CNCDaten[aktuelleladeposition][i]);
+                  Serial.printf("%d \t",CNCDaten[aktuelleladeposition][i]);
                }
-               //Serial.printf("\n");
+               Serial.printf("\n");
                
                
                
