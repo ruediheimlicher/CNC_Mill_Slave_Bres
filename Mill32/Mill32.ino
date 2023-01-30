@@ -627,13 +627,22 @@ uint8_t  AbschnittLaden_bres(const uint8_t* AbschnittDaten) // 22us
    micro = AbschnittDaten[26];
    
    uint16_t index = (AbschnittDaten[18] << 8) | AbschnittDaten[19];
+   
+   if (AbschnittDaten[35] == 1)
+   {
+      Serial.printf("+++ +++ +++ \t\t\t index: %d AbschnittLaden_bres WENDEPUNKT \n",index);
+      rampstatus |=(1<<RAMPOKBIT);
+   }
+
+   
+   
    // pwm-rate
    PWM = AbschnittDaten[20];
    //Serial.printf("AbschnittLaden_4M steps: %d micro: %d PWM: %d\n",steps,micro,PWM);
    //Serial.printf("AbschnittLaden_bres start \n");
    analogWrite(DC_PWM, PWM);
    
-   Serial.printf("AbschnittLaden_bres AbschnittDaten eingang index: %d\n", index);
+   //Serial.printf("AbschnittLaden_bres AbschnittDaten eingang index: %d\n", index);
    
    
    /*
@@ -739,42 +748,9 @@ uint8_t  AbschnittLaden_bres(const uint8_t* AbschnittDaten) // 22us
 
    
    CounterB = DelayB;
-   if(index)
-   {
-      /*
-      Serial.printf("+++ +++ +++ +++ +++ +++ +++ +++ +++ +++   \n");
-      Serial.printf("\tlastdax: %d lastday: %d newdax: %d newday: %d \n",lastdax,lastday,newdax,newday);
-      
-      float skalarproda =  lastdax * newdax + lastday*newday; // vektoren: (lastax,lastay), (newax,neway)
-      Serial.printf("AbschnittLaden_bres skalarproda: %.0f\n",skalarproda);
-      
-      float lasthypa = hypotf(lastdax,lastday);
-      float newhypa = hypotf(newdax,newday);
-      float nennera = newhypa * lasthypa;
-      Serial.printf("AbschnittLaden_bres lasthypa: %.0f newhypa: %.0f nennera: %.0f\n",lasthypa,newhypa,nennera);
-      float cos = skalarproda / nennera;
-      if (abs(cos > 0.9))
-      {
-         Serial.printf("AbschnittLaden_bres ramp start\n");
-         //rampstatus |=(1<<RAMPOKBIT);
-      }
-      else 
-      {
-         
-      }
-      float arc = acos(cos);
-      float cosdegree = arc/M_PI * 180;
-      Serial.printf("AbschnittLaden_bres cos: %.4f arc: %.4f cosdegree: %.2f\n",cos, arc, cosdegree);
-     
-      lastdax = newdax;
-      lastday = newday;
-      
-      Serial.printf("+++ +++ +++ +++ +++ +++ +++ +++ +++ +++   \n");
-       */
-   } // if index
    
    
-   // Motor C
+    // Motor C
    digitalWriteFast(MC_EN,LOW);    // Pololu ON
    //CounterC=0;
    dataL=0;
@@ -903,9 +879,11 @@ uint8_t  AbschnittLaden_bres(const uint8_t* AbschnittDaten) // 22us
    //ramptimerintervall = 128;
    if(rampstatus & (1<<RAMPOKBIT))
    {
+      Serial.printf("AbschnittLaden_bres index: %d set RAMPSTARTBIT\n",index);
       rampstatus |= (1<<RAMPSTARTBIT);
       errpos = 0;
-      delayTimer.update(ramptimerintervall*2);
+      ramptimerintervall += (ramptimerintervall/2);;
+      delayTimer.update(ramptimerintervall);
    }
    
    xA = StepCounterA; // 
@@ -953,25 +931,14 @@ uint8_t  AbschnittLaden_bres(const uint8_t* AbschnittDaten) // 22us
 
    errB = deltafastdirectionB/2;
    
-   //Serial.printf("AbschnittLaden_bres deltafastdirectionB: %d deltaslowdirectionB: %d  deltafastdelayB: %d errB: %d  bres_counterB: %d bres_delayB:%d\n",deltafastdirectionB,deltaslowdirectionB, deltafastdelayB,errB,bres_counterB,bres_delayB);
-
-   if (deltafastdirectionA <180) // kleiner Bereich, ca 4mm
-   {
-      Serial.printf("AbschnittLaden_bres index %d kleiner Weg deltafastdirectionA: %d\n",index,deltafastdirectionA);
-      rampschritt = 20;
-      ramptimerintervall = TIMERINTERVALL/4;
-      rampstatus |= (1<<RAMPSTARTBIT);
-      timerintervall_FAST = TIMERINTERVALL;
-   }
-   
-   {
-   Serial.printf("AbschnittLaden_bres ramp start\n");
-   rampstatus |= (1<<RAMPSTARTBIT);
-   ramptimerintervall = 2*TIMERINTERVALL;
+     {
+   //Serial.printf("AbschnittLaden_bres ramp start\n");
+   //rampstatus |= (1<<RAMPSTARTBIT);
+   //ramptimerintervall = 2*TIMERINTERVALL;
    
    timerintervall_FAST = TIMERINTERVALL;
    //  OSZI_B_LO();
-}
+   }
    
    
    // motorstatus: welcher Motor ist relevant
@@ -980,69 +947,13 @@ uint8_t  AbschnittLaden_bres(const uint8_t* AbschnittDaten) // 22us
    // richtung change
 #pragma mark Richtung change
    
-   rampstatus |=(1<<RAMPOKBIT);
-   /*
-   // richtungswechsel bestimmen
-   //uint8_t oldrichtungstatus = richtungstatus; // vorherige Runde
-   richtungstatus = 0;
-   if(CNCDaten[ladeposition][1] > 127) // richtung ax negativ
-   {
-      richtungstatus |= (1<<AXNEG); // set
-   }
-   else
-   {
-      richtungstatus &= ~(1<<AXNEG); // reset
-   }
-   if(CNCDaten[ladeposition][3] > 127) // richtung ax negativ
-   {
-      richtungstatus |= (1<<AYNEG);
-   }
-   else
-   {
-      richtungstatus &= ~(1<<AYNEG); // reset
-   }
+  // rampstatus |=(1<<RAMPOKBIT);
 
-   if(CNCDaten[ladeposition][9] > 127) // richtung bx negativ
-   {
-      richtungstatus |= (1<<BXNEG);
-   }
-   else
-   {
-      richtungstatus &= ~(1<<BXNEG); // reset
-   }
-
-   if(CNCDaten[ladeposition][11] > 127) // richtung by negativ
-   {
-      richtungstatus |= (1<<BYNEG);
-   }
-   else
-   {
-      richtungstatus &= ~(1<<BYNEG); // reset
-   }
-
-   if (oldrichtungstatus ^ richtungstatus)
-   {
-      Serial.printf("++++++++++++++++++++++++++   abschnittnummer: %d richtungstatus geaendert: oldrichtungstatus: %d richtungstatus: %d change: %d\n",abschnittnummer,oldrichtungstatus,richtungstatus,(oldrichtungstatus ^ richtungstatus) );
-      oldrichtungstatus = richtungstatus; // vorherige Runde
-      
-         //rampstatus |=(1<<RAMPOKBIT);
-   }
-   else 
-   {
-      rampstatus &= ~(1<<RAMPOKBIT);
-   }
-   //
-   
-   */
-   
    
    startTimer2();
    
    //Serial.printf("\nAbschnittLaden_bres end aktuellelage: %d \n",returnwert);
-   
-   
-   
-    return returnwert;
+     return returnwert;
  
 }
 
@@ -1458,7 +1369,7 @@ void setup()
    delay(100);
    lcd.backlight();
    
-  rampstatus |=(1<<RAMPOKBIT);
+  //rampstatus |=(1<<RAMPOKBIT);
    
    //lcd.setCursor(0,0);
    //lcd.print("hallo");
