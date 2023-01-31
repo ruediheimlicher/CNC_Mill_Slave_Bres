@@ -217,7 +217,7 @@ volatile uint16_t          timerintervall_FAST = 0; // Intervall gross
 
 // Ramp
 
-volatile uint16_t          ramptimerintervall = 2*TIMERINTERVALL;
+volatile uint16_t          ramptimerintervall = TIMERINTERVALL;
 
 volatile uint8_t           rampstatus=0;
 //volatile uint8_t           RampZeit = RAMPZEIT;
@@ -225,7 +225,7 @@ volatile uint8_t           rampstatus=0;
 volatile uint32_t          rampstepstart=0; // Stepcounter am Anfang
 volatile uint32_t          ramptimercounter=0;  // laufender counter  fuer Rampanpassung
 //volatile uint32_t          //ramptimerdelay = 100;  // Takt fuer Rampanpassung
-uint8_t                    rampschritt = 1;
+uint8_t                    rampschritt = 2;
 volatile uint16_t          rampbreite = 0;  // anzahl Schritte der Ramp. Wird beim Start bestimmt und fuer das Ende verwendet
 
 volatile uint32_t          rampendstep = 0; // Beginn der Endramp. Wird in Abschnittladen bestimmt
@@ -876,13 +876,12 @@ uint8_t  AbschnittLaden_bres(const uint8_t* AbschnittDaten) // 22us
    bres_delayA = deltafastdelayA; // aktueller delay in fastdir
    bres_counterA = deltafastdirectionA; // aktueller counter fuer steps
    
-   //ramptimerintervall = 128;
    if(rampstatus & (1<<RAMPOKBIT))
    {
       Serial.printf("AbschnittLaden_bres index: %d set RAMPSTARTBIT\n",index);
       rampstatus |= (1<<RAMPSTARTBIT);
       errpos = 0;
-      ramptimerintervall += (ramptimerintervall/2);;
+      ramptimerintervall += (ramptimerintervall/4*3);
       delayTimer.update(ramptimerintervall);
    }
    
@@ -932,9 +931,6 @@ uint8_t  AbschnittLaden_bres(const uint8_t* AbschnittDaten) // 22us
    errB = deltafastdirectionB/2;
    
      {
-   //Serial.printf("AbschnittLaden_bres ramp start\n");
-   //rampstatus |= (1<<RAMPSTARTBIT);
-   //ramptimerintervall = 2*TIMERINTERVALL;
    
    timerintervall_FAST = TIMERINTERVALL;
    //  OSZI_B_LO();
@@ -2469,7 +2465,6 @@ void loop()
          
          if (rampstatus & (1<<RAMPSTARTBIT))
          {
-            //errarray[errpos++] = ramptimerintervall;
             if (ramptimerintervall > timerintervall_FAST) // noch nicht auf max speed
             {
                //errarray[errpos++] = ramptimerintervall;
